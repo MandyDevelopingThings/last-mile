@@ -5,12 +5,20 @@ import { DeliveryRepository } from '../domain/repositories/delivery.repository';
 import { TypeOrmDeliveryRepository } from './persistence/repositories/typeorm-delivery.repository';
 import { SyncDeliveriesUseCase } from '../application/use-cases/sync-deliveries.use-case';
 import { ListDeliveriesUseCase } from '../application/use-cases/list-deliveries.use-case';
+import { DeliveryController } from '../presentation/controllers/delivery.controller';
+import { IdempotencyInterceptor } from '../presentation/interceptors/idempotency.interceptor';
+import { IdempotencyModule } from './idempotency/idempotency.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DeliveryOrmEntity])],
+  imports: [
+    TypeOrmModule.forFeature([DeliveryOrmEntity]),
+    IdempotencyModule,
+  ],
+  controllers: [DeliveryController],
   providers: [
     SyncDeliveriesUseCase,
     ListDeliveriesUseCase,
+    IdempotencyInterceptor,
     {
       provide: DeliveryRepository,
       useClass: TypeOrmDeliveryRepository,
