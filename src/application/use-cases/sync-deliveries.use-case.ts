@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DeliveryStatus } from '../../domain/enums/delivery-status.enum';
+import { DEFAULT_CLOCK_SKEW_TOLERANCE_MS } from '../../domain/constants/delivery.constants';
 import {
   DeliveryRepository,
   DeliveryStatusUpdate,
@@ -7,15 +8,13 @@ import {
 import { SyncDeliveriesInput } from '../dtos/sync-deliveries.input';
 import { SyncDeliveriesOutput } from '../dtos/sync-deliveries.output';
 
-const CLOCK_SKEW_TOLERANCE_MS = 5_000;
-
 @Injectable()
 export class SyncDeliveriesUseCase {
   constructor(private readonly deliveryRepository: DeliveryRepository) {}
 
   public async execute(input: SyncDeliveriesInput): Promise<SyncDeliveriesOutput> {
     const syncTime = new Date();
-    const maxAllowedDate = new Date(Date.now() + CLOCK_SKEW_TOLERANCE_MS);
+    const maxAllowedDate = new Date(Date.now() + DEFAULT_CLOCK_SKEW_TOLERANCE_MS);
 
     const consolidatedMap = new Map<string, DeliveryStatusUpdate>();
 

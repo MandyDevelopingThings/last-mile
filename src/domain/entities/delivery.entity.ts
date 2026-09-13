@@ -1,6 +1,5 @@
 import { DeliveryStatus } from '../enums/delivery-status.enum';
-
-const CLOCK_SKEW_TOLERANCE_MS = 5_000;
+import { DEFAULT_CLOCK_SKEW_TOLERANCE_MS } from '../constants/delivery.constants';
 
 export interface CreateDeliveryProps {
   id: string;
@@ -57,7 +56,7 @@ export class Delivery {
       throw new Error('Valid occurredAt date is required');
     }
 
-    const maxAllowedDate = new Date(Date.now() + CLOCK_SKEW_TOLERANCE_MS);
+    const maxAllowedDate = new Date(Date.now() + DEFAULT_CLOCK_SKEW_TOLERANCE_MS);
     if (props.occurredAt > maxAllowedDate) {
       throw new Error('occurredAt cannot be in the future');
     }
