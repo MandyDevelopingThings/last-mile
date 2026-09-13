@@ -7,13 +7,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { DeliveryStatus } from '../../domain/enums/delivery-status.enum';
-
-export const ALLOWED_SYNC_STATUSES = [
-  DeliveryStatus.IN_TRANSIT,
-  DeliveryStatus.DELIVERED,
-  DeliveryStatus.FAILED_ATTEMPT,
-] as const;
+import {
+  DeliveryStatus,
+  ALLOWED_SYNC_STATUSES,
+} from '../../domain/enums/delivery-status.enum';
 
 export class SyncDeliveryItemDto {
   @ApiProperty({ example: '0191f630-1000-7000-8000-000000000001' })
