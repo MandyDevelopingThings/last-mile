@@ -17,6 +17,12 @@ export class TypeOrmDeliveryRepository implements DeliveryRepository {
     private readonly repo: Repository<DeliveryOrmEntity>
   ) {}
 
+  public async create(delivery: Delivery): Promise<Delivery> {
+    const orm = DeliveryMapper.toOrm(delivery);
+    const saved = await this.repo.save(orm);
+    return DeliveryMapper.toDomain(saved);
+  }
+
   public async saveBatchUpsert(deliveries: Delivery[]): Promise<BatchUpsertResult> {
     if (deliveries.length === 0) {
       return { saved: [], ignoredCount: 0 };
