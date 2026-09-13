@@ -1,33 +1,27 @@
 import {
   IsArray,
-  IsEnum,
+  IsIn,
   IsISO8601,
-  IsNotEmpty,
-  IsString,
   IsUUID,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { DeliveryStatus } from '../../domain/enums/delivery-status.enum';
 
+export const ALLOWED_SYNC_STATUSES = [
+  DeliveryStatus.IN_TRANSIT,
+  DeliveryStatus.DELIVERED,
+  DeliveryStatus.FAILED_ATTEMPT,
+] as const;
+
 export class SyncDeliveryItemDto {
   @IsUUID('all')
   id: string;
 
-  @IsString()
-  @IsNotEmpty()
-  trackingCode: string;
-
-  @IsEnum(DeliveryStatus)
+  @IsIn(ALLOWED_SYNC_STATUSES, {
+    message: `status must be one of: ${ALLOWED_SYNC_STATUSES.join(', ')} (PENDING is not allowed in POST /sync/deliveries)`,
+  })
   status: DeliveryStatus;
-
-  @IsString()
-  @IsNotEmpty()
-  recipientName: string;
-
-  @IsString()
-  @IsNotEmpty()
-  deliveryAddress: string;
 
   @IsISO8601()
   occurredAt: string;

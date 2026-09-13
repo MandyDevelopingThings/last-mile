@@ -63,40 +63,60 @@ async function executeSimulation(): Promise<void> {
 
   try {
     console.log('------------------------------------------------------------------------');
+    console.log('ETAPA PRÉVIA: Central cadastra entregas pendentes (POST /deliveries)');
+    console.log('------------------------------------------------------------------------');
+
+    const created1 = await axios.post(
+      `${API_URL}/deliveries`,
+      {
+        trackingCode: 'TRK-BR-001',
+        recipientName: 'Carlos Drummond',
+        deliveryAddress: 'Rua Itabira, 100',
+      },
+      { headers: { 'Idempotency-Key': uuidv7() } }
+    );
+    const deliveryId1 = created1.data.id;
+    console.log(`Pacote 1 cadastrado pela Central: ${deliveryId1} (TRK-BR-001) - Status: PENDING`);
+
+    const created2 = await axios.post(
+      `${API_URL}/deliveries`,
+      {
+        trackingCode: 'TRK-BR-002',
+        recipientName: 'Clarice Lispector',
+        deliveryAddress: 'Av Atlântica, 500',
+      },
+      { headers: { 'Idempotency-Key': uuidv7() } }
+    );
+    const deliveryId2 = created2.data.id;
+    console.log(`Pacote 2 cadastrado pela Central: ${deliveryId2} (TRK-BR-002) - Status: PENDING\n`);
+
+    console.log('------------------------------------------------------------------------');
     console.log('CENÁRIO 1: Concorrência Extrema e In-Flight Locking (409 Conflict)');
     console.log('------------------------------------------------------------------------');
     const sharedIdempotencyKey = uuidv7();
-    const deliveryId1 = uuidv7();
-    const deliveryId2 = uuidv7();
 
     const payloadScenario1 = {
       deliveries: [
         {
           id: deliveryId1,
-          trackingCode: 'TRK-BR-001',
           status: DeliveryStatus.IN_TRANSIT,
-          recipientName: 'Carlos Drummond',
-          deliveryAddress: 'Rua Itabira, 100',
-          occurredAt: new Date(Date.now() - 60000).toISOString(),
+          occurredAt: new Date(Date.now() + 1000).toISOString(),
         },
         {
           id: deliveryId2,
-          trackingCode: 'TRK-BR-002',
-          status: DeliveryStatus.PENDING,
-          recipientName: 'Clarice Lispector',
-          deliveryAddress: 'Av Atlântica, 500',
-          occurredAt: new Date(Date.now() - 120000).toISOString(),
+          status: DeliveryStatus.IN_TRANSIT,
+          occurredAt: new Date(Date.now() + 1000).toISOString(),
         },
       ],
     };
 
-    console.log(`Chave de Idempotência: ${sharedIdempotencyKey}`);
-    console.log(`Disparando 5 requisições simultâneas em paralelo (Promise.all)...`);
+    console.log(`Chave de Idempotência do Lote: ${sharedIdempotencyKey}`);
+    console.log(`Disparando 10 requisições simultâneas em paralelo (Promise.all)...`);
 
-    const parallelRequests = Array.from({ length: 5 }, (_, index) =>
+    const parallelRequests = Array.from({ length: 10 }, (_, index) =>
       axios
         .post(`${API_URL}/sync/deliveries`, payloadScenario1, {
-          headers: { 'Idempotency-Key': sharedIdempotencyKey },
+          headers: { 'Idempotency-Key': sharedIdempotencyKey, Connection: 'close' },
           validateStatus: () => true,
         })
         .then((res) => ({ index: index + 1, status: res.status, data: res.data }))
@@ -164,10 +184,7 @@ async function executeSimulation(): Promise<void> {
       deliveries: [
         {
           id: deliveryId1,
-          trackingCode: 'TRK-BR-001',
           status: DeliveryStatus.DELIVERED,
-          recipientName: 'ALTERADO / FRAUDE',
-          deliveryAddress: 'Rua Itabira, 100',
           occurredAt: new Date().toISOString(),
         },
       ],
@@ -189,9 +206,19 @@ async function executeSimulation(): Promise<void> {
     console.log('------------------------------------------------------------------------');
     console.log('CENÁRIO 4: Desordem Temporal e Resolução Last-Write-Wins (Out-of-order)');
     console.log('------------------------------------------------------------------------');
-    const newerOccurredAt = new Date('2026-09-16T12:00:00.000Z');
-    const olderOccurredAt = new Date('2026-09-16T10:00:00.000Z');
-    const deliveryId3 = uuidv7();
+    const newerOccurredAt = new Date(Date.now() + 1500);
+    const olderOccurredAt = new Date(Date.now() - 60000);
+
+    const created3 = await axios.post(
+      `${API_URL}/deliveries`,
+      {
+        trackingCode: 'TRK-ORDER-003',
+        recipientName: 'Machado de Assis',
+        deliveryAddress: 'Rua do Cosme Velho, 18',
+      },
+      { headers: { 'Idempotency-Key': uuidv7() } }
+    );
+    const deliveryId3 = created3.data.id;
 
     const initialKey = uuidv7();
     await axios.post(
@@ -200,17 +227,14 @@ async function executeSimulation(): Promise<void> {
         deliveries: [
           {
             id: deliveryId3,
-            trackingCode: 'TRK-ORDER-003',
             status: DeliveryStatus.DELIVERED,
-            recipientName: 'Machado de Assis',
-            deliveryAddress: 'Rua do Cosme Velho, 18',
             occurredAt: newerOccurredAt.toISOString(),
           },
         ],
       },
       { headers: { 'Idempotency-Key': initialKey } }
     );
-    console.log(`Estado inicial gravado: TRK-ORDER-003 status = DELIVERED às ${newerOccurredAt.toISOString()}`);
+    console.log(`Estado atualizado pelo motorista: TRK-ORDER-003 status = DELIVERED às ${newerOccurredAt.toISOString()}`);
 
     const lateArrivalKey = uuidv7();
     const lateResponse = await axios.post(
@@ -219,10 +243,7 @@ async function executeSimulation(): Promise<void> {
         deliveries: [
           {
             id: deliveryId3,
-            trackingCode: 'TRK-ORDER-003',
             status: DeliveryStatus.FAILED_ATTEMPT,
-            recipientName: 'Machado de Assis',
-            deliveryAddress: 'Rua do Cosme Velho, 18',
             occurredAt: olderOccurredAt.toISOString(),
           },
         ],

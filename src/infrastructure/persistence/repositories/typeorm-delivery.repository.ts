@@ -5,6 +5,7 @@ import { Delivery } from '../../../domain/entities/delivery.entity';
 import {
   BatchUpsertResult,
   DeliveryRepository,
+  DeliveryStatusUpdate,
 } from '../../../domain/repositories/delivery.repository';
 import { DeliveryOrmEntity } from '../entities/delivery.orm-entity';
 import { DeliveryMapper } from '../mappers/delivery.mapper';
@@ -23,8 +24,10 @@ export class TypeOrmDeliveryRepository implements DeliveryRepository {
     return DeliveryMapper.toDomain(saved);
   }
 
-  public async saveBatchUpsert(deliveries: Delivery[]): Promise<BatchUpsertResult> {
-    if (deliveries.length === 0) {
+  public async updateBatchStatuses(
+    updates: DeliveryStatusUpdate[]
+  ): Promise<BatchUpsertResult> {
+    if (updates.length === 0) {
       return { saved: [], ignoredCount: 0 };
     }
 
@@ -36,25 +39,21 @@ export class TypeOrmDeliveryRepository implements DeliveryRepository {
       const saved: Delivery[] = [];
       let ignoredCount = 0;
 
-      for (const delivery of deliveries) {
+      for (const update of updates) {
         const existing = await queryRunner.manager.findOne(DeliveryOrmEntity, {
-          where: { id: delivery.id },
+          where: { id: update.id },
         });
 
         if (!existing) {
-          const orm = DeliveryMapper.toOrm(delivery);
-          await queryRunner.manager.insert(DeliveryOrmEntity, orm);
-          saved.push(delivery);
+          ignoredCount++;
         } else {
-          if (existing.occurredAt > delivery.occurredAt) {
+          if (existing.occurredAt > update.occurredAt) {
             ignoredCount++;
             saved.push(DeliveryMapper.toDomain(existing));
           } else {
-            existing.status = delivery.status;
-            existing.recipientName = delivery.recipientName;
-            existing.deliveryAddress = delivery.deliveryAddress;
-            existing.occurredAt = delivery.occurredAt;
-            existing.syncedAt = delivery.syncedAt ?? new Date();
+            existing.status = update.status;
+            existing.occurredAt = update.occurredAt;
+            existing.syncedAt = update.syncedAt;
 
             const updated = await queryRunner.manager.save(DeliveryOrmEntity, existing);
             saved.push(DeliveryMapper.toDomain(updated));

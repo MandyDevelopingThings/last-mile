@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { Delivery } from '../../domain/entities/delivery.entity';
-import { DeliveryRepository } from '../../domain/repositories/delivery.repository';
+import { DeliveryStatus } from '../../domain/enums/delivery-status.enum';
+import {
+  DeliveryRepository,
+  DeliveryStatusUpdate,
+} from '../../domain/repositories/delivery.repository';
 import { SyncDeliveriesInput } from '../dtos/sync-deliveries.input';
 import { SyncDeliveriesOutput } from '../dtos/sync-deliveries.output';
+
+const CLOCK_SKEW_TOLERANCE_MS = 5_000;
 
 @Injectable()
 export class SyncDeliveriesUseCase {
@@ -10,31 +15,45 @@ export class SyncDeliveriesUseCase {
 
   public async execute(input: SyncDeliveriesInput): Promise<SyncDeliveriesOutput> {
     const syncTime = new Date();
+    const maxAllowedDate = new Date(Date.now() + CLOCK_SKEW_TOLERANCE_MS);
 
-    const consolidatedMap = new Map<string, Delivery>();
+    const consolidatedMap = new Map<string, DeliveryStatusUpdate>();
 
     for (const item of input.deliveries) {
-      const delivery = new Delivery({
-        id: item.id,
-        trackingCode: item.trackingCode,
+      if (!item.id || item.id.trim().length === 0) {
+        throw new Error('Delivery ID is required');
+      }
+
+      if (item.status === DeliveryStatus.PENDING) {
+        throw new Error('Delivery status cannot be PENDING in sync operation');
+      }
+
+      const occurredAtDate = new Date(item.occurredAt);
+      if (isNaN(occurredAtDate.getTime())) {
+        throw new Error('Valid occurredAt date is required');
+      }
+
+      if (occurredAtDate > maxAllowedDate) {
+        throw new Error('occurredAt cannot be in the future');
+      }
+
+      const update: DeliveryStatusUpdate = {
+        id: item.id.trim(),
         status: item.status,
-        recipientName: item.recipientName,
-        deliveryAddress: item.deliveryAddress,
-        occurredAt: new Date(item.occurredAt),
-      });
+        occurredAt: occurredAtDate,
+        syncedAt: syncTime,
+      };
 
-      delivery.markAsSynced(syncTime);
-
-      const existing = consolidatedMap.get(delivery.id);
-      if (!existing || delivery.occurredAt >= existing.occurredAt) {
-        consolidatedMap.set(delivery.id, delivery);
+      const existing = consolidatedMap.get(update.id);
+      if (!existing || update.occurredAt >= existing.occurredAt) {
+        consolidatedMap.set(update.id, update);
       }
     }
 
-    const uniqueDeliveries = Array.from(consolidatedMap.values());
-    const result = await this.deliveryRepository.saveBatchUpsert(uniqueDeliveries);
+    const uniqueUpdates = Array.from(consolidatedMap.values());
+    const result = await this.deliveryRepository.updateBatchStatuses(uniqueUpdates);
 
-    const inBatchIgnoredCount = input.deliveries.length - uniqueDeliveries.length;
+    const inBatchIgnoredCount = input.deliveries.length - uniqueUpdates.length;
     const totalIgnoredCount = inBatchIgnoredCount + result.ignoredCount;
 
     return {

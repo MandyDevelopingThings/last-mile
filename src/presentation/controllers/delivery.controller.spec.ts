@@ -54,10 +54,7 @@ describe('DeliveryController (Unit Tests)', () => {
       deliveries: [
         {
           id: '0191f630-1000-7000-8000-000000000001',
-          trackingCode: 'TRK-100',
           status: DeliveryStatus.PENDING,
-          recipientName: 'Lucas Lima',
-          deliveryAddress: 'Rua Central, 50',
           occurredAt: new Date().toISOString(),
         },
       ],
