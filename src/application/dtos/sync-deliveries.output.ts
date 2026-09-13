@@ -1,12 +1,7 @@
-export interface SyncedDeliveryItemOutput {
-  id: string;
-  trackingCode: string;
-  status: string;
-  recipientName: string;
-  deliveryAddress: string;
-  occurredAt: string;
+import { CreateDeliveryOutput } from './create-delivery.output';
+
+export interface SyncedDeliveryItemOutput extends CreateDeliveryOutput {
   syncedAt: string;
-  version: number;
 }
 
 export interface SyncDeliveriesOutput {
